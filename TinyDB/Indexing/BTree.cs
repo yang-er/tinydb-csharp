@@ -1,29 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TinyDb.Indexing;
 
-namespace TinyDb.Indexing
+namespace TinyDb
 {
-    public class BTree
+    public partial class DbSet<T>
     {
-        public static IndexNode Root { get; private set; }
+        IndexNode<T> root;
 
         /// <summary>
-        /// 构造B+树
+        /// 寻找一个节点。
         /// </summary>
-        /// <param name="indexList">索引列表</param>
-        /// <returns>根节点</returns>
-        public static IndexNode Build(List<DataEntry> indexList)
+        /// <typeparam name="T">参数类型</typeparam>
+        /// <param name="node">节点</param>
+        /// <param name="key">查询键值</param>
+        /// <returns>所找到的节点</returns>
+        private IndexNode<T> FindNode(IndexNode<T> node, int key)
         {
-            Root = null;
+            if (node is null) return null;
 
-            foreach (var de in indexList)
-            {
-                IndexLeafNode node = Find(Root, de.Key);
-                Insert(node, de);
-            }
+            // 如果是叶结点则表明此叶结点就是待插入位置
+            if (node.IsLeaf) return node;
 
-            return Root;
+            // 如果是内节点遍历孩子结点
+            foreach (var child in node.Childs)
+                if (key <= child.Key)
+                    return FindNode(child, key);
+
+            // 如果没有比待插入关键字小的结点，则把最大的结点作为根节点递归查找
+            return FindNode(node.Childs.LastOrDefault(), key);
         }
 
         /// <summary>
@@ -31,98 +37,81 @@ namespace TinyDb.Indexing
         /// </summary>
         /// <param name="node">节点</param>
         /// <param name="de">数据内容</param>
-        private static void Insert(IndexLeafNode node, DataEntry de)
+        private void Insert(IndexNode<T> node, T de)
         {
             if (node == null)
             {
                 // 如果待插入节点为空，表明树为空，则新建叶子节点作为根节点
-                var data = new List<DataEntry> { de };
+                var data = new List<T> { de };
 
                 //没有父节点，没孩子节点，是叶节点，数据，不是右叶子节点
-                Root = new IndexLeafNode(true, null, null, data, null);
+                root = new IndexNode<T>(null, data, null);
                 return;
             }
 
-            bool isExist = false;
-            foreach (DataEntry e in node.Data)
+            System.Diagnostics.Debug.Assert(node.IsLeaf);
+
+            // 叶节点中无该索引
+            node.GetData().Add(de); // 添加关键字至关键字集合
+            node.GetData().Sort((t, t2) => t.PrimaryKey.CompareTo(t2.PrimaryKey)); // 将关键字排序
+            node.FlushData();
+
+            if (node.GetData().Last().Equals(de) && node.RightNode == null)
             {
-                // 在叶节点中查找是否有相同索引，如果有则添加到该索引的值集合中
-                if (e.Key == de.Key)
+                // 如果插入的关键字大于所有已插入的关键字，则将父亲的最大关键字设置为插入的关键字值
+                var temp = node.Parent;
+                while (temp != null)
                 {
-                    e.Index.AddRange(de.Index);
-                    isExist = true;
-                    break;
+                    temp.Childs.Last().Key = de.PrimaryKey;
+                    temp = temp.Parent;
                 }
             }
 
-            if (!isExist)
+            if (node.GetData().Count > IndexNode<T>.PNUMBER)
             {
-                // 叶节点中无该索引
-                node.Data.Add(de); // 添加关键字至关键字集合
-                node.Data.Sort();// 将关键字排序
-
-                if (node.Data.Last().Equals(de) && node.RightNode == null)
-                {
-                    // 如果插入的关键字大于所有已插入的关键字，则将父亲的最大关键字设置为插入的关键字值
-                    var temp = node.Parent;
-                    while (temp != null)
-                    {
-                        temp.Childs.Last().Key = de.Key;
-                        temp = temp.Parent;
-                    }
-                }
-
-                if (node.Data.Count > IndexNode.PNUMBER)
-                {
-                    // 关键字数目大于指定阶数
-                    Split(node); // 分裂
-                }
+                // 关键字数目大于指定阶数
+                SplitNode(node); // 分裂
             }
         }
 
         /// <summary>
-        /// 分裂
+        /// 分裂节点
         /// </summary>
-        /// <param name="node">要分裂的节点</param>
-        private static void Split(IndexNode node)
+        /// <param name="node">节点</param>
+        private void SplitNode(IndexNode<T> node)
         {
-            long leftkey;
-
             if (node.IsLeaf)
             {
-                // 叶子节点
-                var tn = (IndexLeafNode)node; // 强制类型转换为叶节点
-                int n = tn.Data.Count / 2; // 分裂位置
-                leftkey = tn.Data[n].Key; //分裂处的关键字
-
-                var newLeaf = new IndexLeafNode(true, null, null, new List<DataEntry>(), tn.RightNode);
+                int n = node.GetData().Count / 2; // 分裂位置
+                int leftkey = node.GetData()[n].PrimaryKey; //分裂处的关键字
+                var newLeaf = new IndexNode<T>(null, new List<T>(), node.RightNode);
 
                 while (n-- > 0)
                 {
-                    newLeaf.Data.Add(tn.Data[IndexNode.PNUMBER / 2 + 1]);
-                    tn.Data.RemoveAt(IndexNode.PNUMBER / 2 + 1);
+                    newLeaf.GetData().Add(node.GetData()[IndexNode<T>.PNUMBER / 2 + 1]);
+                    node.GetData().RemoveAt(IndexNode<T>.PNUMBER / 2 + 1);
                 }
 
-                tn.RightNode = newLeaf;
-                newLeaf.Data.Sort();
+                node.RightNode = newLeaf;
+                newLeaf.GetData().Sort((t, t2) => t.PrimaryKey.CompareTo(t2.PrimaryKey));
+                int rightKey = newLeaf.GetData().Last().PrimaryKey;
 
-                long rightKey = newLeaf.Data.Last().Key;
+                node.FlushData();
+                newLeaf.FlushData();
+
                 if (node.Parent is null)
                 {
                     // 是根节点
-                    var newParent = new IndexNode(false, null, new List<NodeEntry>());
-                    var ln = new NodeEntry(leftkey, node);
-                    var rn = new NodeEntry(rightKey, newLeaf);
-                    newParent.Childs.Add(ln);
-                    newParent.Childs.Add(rn);
-                    node.Parent = newParent;
-                    newLeaf.Parent = newParent;
-                    Root = newParent;
+                    node.Key = leftkey;
+                    newLeaf.Key = rightKey;
+                    var newParent = new IndexNode<T>(null, new List<IndexNode<T>> { node, newLeaf });
+                    node.Parent = newLeaf.Parent = newParent;
+                    root = newParent;
                 }
                 else
                 {
                     // 不是根结点
-                    var parent = node.Parent; // 获取父亲结点
+                    var parent = node.Parent;
 
                     foreach (var ne in parent.Childs)
                     {
@@ -134,14 +123,15 @@ namespace TinyDb.Indexing
                         }
                     }
 
-                    parent.Childs.Add(new NodeEntry(rightKey, newLeaf));
+                    newLeaf.Key = rightKey;
+                    parent.Childs.Add(newLeaf);
                     newLeaf.Parent = parent;
-                    parent.Childs.Sort();
+                    parent.Childs.Sort((t, t1) => t.Key.CompareTo(t1.Key));
 
-                    if (parent.Childs.Count > IndexNode.PNUMBER)
+                    if (parent.Childs.Count > IndexNode<T>.PNUMBER)
                     {
                         // 如果分裂后的父亲结点孩子数大于指定阶数则继续分裂
-                        Split(parent);
+                        SplitNode(parent);
                     }
                 }
             }
@@ -149,37 +139,33 @@ namespace TinyDb.Indexing
             {
                 // 内结点
                 int n = node.Childs.Count / 2; // 分裂位置
-                leftkey = node.Childs[n].Key; // 分裂处的关键字
-                var newNode = new IndexNode(false, node.Parent, new List<NodeEntry>()); // 创建新结点
+                int leftkey = node.Childs[n].Key; // 分裂处的关键字
+                var newNode = new IndexNode<T>(node.Parent, childs: null); // 创建新结点
 
                 while (n-- > 0)
                 {
-                    // 将分裂的结点添加到新街点
-                    newNode.Childs.Add(node.Childs[IndexNode.PNUMBER / 2 + 1]);
-                    node.Childs.RemoveAt(IndexNode.PNUMBER / 2 + 1);
-                    newNode.Childs.Last().Node.Parent = newNode;
+                    // 将分裂的结点添加到新节点
+                    newNode.Childs.Add(node.Childs[IndexNode<T>.PNUMBER / 2 + 1]);
+                    node.Childs.RemoveAt(IndexNode<T>.PNUMBER / 2 + 1);
+                    newNode.Childs.Last().Parent = newNode;
                     // 更新新结点中的孩子结点的父节点
                 }
 
-                long rightKey = newNode.Childs.Last().Key;
+                int rightKey = newNode.Childs.Last().Key;
 
                 if (node.Parent == null)
                 {
                     // 是根节点
-                    IndexNode newParent = new IndexNode(false, null, new List<NodeEntry>());
-                    NodeEntry ln = new NodeEntry(leftkey, node);
-                    NodeEntry rn = new NodeEntry(rightKey, newNode);
-                    newParent.Childs.Add(ln);
-                    newParent.Childs.Add(rn);
-                    node.Parent = newParent;
-                    newNode.Parent = newParent;
-                    Root = newParent;
+                    node.Key = leftkey;
+                    newNode.Key = rightKey;
+                    var newParent = new IndexNode<T>(null, new List<IndexNode<T>> { node, newNode });
+                    node.Parent = newNode.Parent = newParent;
+                    root = newParent;
                 }
                 else
                 {
-                    // 不是根节点
-                    // 获取父亲结点
-                    IndexNode parent = node.Parent;
+                    // 不是根节点，获取父亲结点
+                    var parent = node.Parent;
 
                     foreach (var ne in parent.Childs)
                     {
@@ -191,66 +177,79 @@ namespace TinyDb.Indexing
                         }
                     }
 
-                    parent.Childs.Add(new NodeEntry(rightKey, newNode));
+                    newNode.Key = rightKey;
+                    parent.Childs.Add(newNode);
                     newNode.Parent = parent;
                     parent.Childs.Sort();
 
-                    if (parent.Childs.Count > IndexNode.PNUMBER)
+                    if (parent.Childs.Count > IndexNode<T>.PNUMBER)
                     {
                         // 如果分裂后的父亲结点孩子数大于指定阶数则继续分裂
-                        Split(parent);
+                        SplitNode(parent);
                     }
                 }
             }
-
         }
 
         /// <summary>
-        /// 查找所给关键字插入位置,如果所给关键字为空，则返回叶子节点的第一个结点（即最小关键字所在结点）
+        /// 当作可枚举内容。
         /// </summary>
-        /// <param name="node"></param>
-        /// <param name="key"></param>
-        /// <returns></returns>
-        public static IndexLeafNode Find(IndexNode node, long key)
+        /// <typeparam name="T">实体类型</typeparam>
+        /// <param name="node">节点</param>
+        /// <returns>所有内容</returns>
+        public IEnumerable<T> AsEnumerable(IndexNode<T> node)
         {
-            if (node == null)
-            {
-                // 如果没有根节点，返回空
-                return null;
-            }
+            var leaf = FindNode(node, int.MinValue);
 
-            if (node.IsLeaf)
+            while (leaf != null)
             {
-                // 如果是叶结点则表明此叶结点就是待插入位置
-                return (IndexLeafNode)node;
+                foreach (var item in leaf.GetData())
+                    yield return item;
+                leaf = leaf.RightNode;
             }
+        }
 
-            foreach (var e in node.Childs)
+        private VirtualTree Convert(IndexNode<T> src)
+        {
+            if (src is null) return null;
+            return new VirtualTree
             {
-                // 如果是内节点遍历孩子结点
-                if (key <= e.Key)
+                IsLeaf = src.IsLeaf,
+                Key = src.Key,
+                Childs = src.Childs?.Select(s => Convert(s)).ToList(),
+                Data = src.Data,
+            };
+        }
+
+        private class VirtualTree
+        {
+            public bool IsLeaf { get; set; }
+            public int Key { get; set; }
+            public List<VirtualTree> Childs { get; set; }
+            public Guid? Data { get; set; }
+        }
+
+        private IndexNode<T> ConvertBack(VirtualTree src)
+        {
+            var inode = new IndexNode<T>(src.IsLeaf, src.Key, src.Data);
+
+            if (!src.IsLeaf)
+            {
+                inode.Childs.AddRange(src.Childs.Select(t =>
                 {
-                    // 如果待插入关键字<=某孩子结点关键字，把此孩子作为根结点递归查找
-                    return Find(e.Node, key);
-                }
+                    var n = ConvertBack(t);
+                    n.Parent = inode;
+                    return n;
+                }));
             }
-
-            return Find(node.Childs.Last().Node, key);
-            // 如果此结点中没有比待插入关键字小的结点，则把孩子节点中关键字最大的结点作为根节点递归查找
-        }
-
-        /// <summary>
-        /// 显示B+树
-        /// </summary>
-        /// <param name="node">目前节点</param>
-        public static void Display(IndexNode node)
-        {
-            IndexLeafNode dis = Find(node, long.MinValue);
-            while (dis != null)
+            else
             {
-                Console.WriteLine(dis.Data);
-                dis = dis.RightNode;
+                if (root != null)
+                    root.RightNode = inode;
+                root = inode;
             }
+
+            return inode;
         }
     }
 }

@@ -1,20 +1,34 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using TinyDb.Querying;
+using TinyDb.Structure;
 
 namespace TinyDb
 {
-    public class DbSet<T> : IQueryable<T>
+    public partial class DbSet<T> : IQueryable<T>
+        where T : IDbEntry
     {
-        public DbSet()
+        public DbSet(string tableName)
         {
             Provider = new QueryProvider();
             Expression = Expression.Constant(this);
+            TableName = tableName;
+
+            if (File.Exists($"{tableName}.index"))
+            {
+                var vt = File.ReadAllText($"{tableName}.index")
+                    .ParseJson<VirtualTree>();
+                root = null;
+                root = ConvertBack(vt);
+            }
         }
+
+        public string TableName { get; }
 
         public Type ElementType => typeof(T);
 
@@ -24,7 +38,9 @@ namespace TinyDb
 
         public void Insert(T entity)
         {
-            throw new NotImplementedException();
+            var node = FindNode(root, entity.PrimaryKey);
+            Insert(node, entity);
+            File.WriteAllText($"{TableName}.index", (root is null ? null : Convert(root)).ToJson());
         }
 
         public void Delete(T entity)
@@ -39,12 +55,12 @@ namespace TinyDb
 
         public IEnumerator<T> GetEnumerator()
         {
-            return ((IEnumerable<T>)Provider.Execute(Expression)).GetEnumerator();
+            return AsEnumerable(root).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable)Provider.Execute(Expression)).GetEnumerator();
+            return AsEnumerable(root).GetEnumerator();
         }
     }
 }
