@@ -24,13 +24,33 @@ namespace TinyDb.Querying
 
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
         {
-            System.Diagnostics.Debug.Assert(typeof(TElement) == expression.Type);
             return new MyQueryable<TElement>(this, expression);
         }
 
         public object Execute(Expression expression)
         {
-            throw new NotImplementedException();
+            if (expression is MethodCallExpression mce)
+            {
+                if (mce.Method.Name == "Where")
+                {
+
+                    throw new NotImplementedException();
+                }
+                else if (mce.Method.Name == "Select")
+                {
+
+                    throw new NotImplementedException();
+                }
+                else
+                {
+
+                    throw new NotImplementedException();
+                }
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public TResult Execute<TResult>(Expression expression)
