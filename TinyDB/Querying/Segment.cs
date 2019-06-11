@@ -47,6 +47,15 @@ namespace TinyDb.Querying
                 if (Left == other.Right && (!LeftEqual || !other.RightEqual)) return false;
                 return true;
             }
+
+            public bool Join(SingleSegment other)
+            {
+                if (Right < other.Left) return false;
+                if (Left > other.Right) return false;
+                if (Right == other.Left && !(RightEqual || other.LeftEqual)) return false;
+                if (Left == other.Right && !(LeftEqual || other.RightEqual)) return false;
+                return true;
+            }
         }
 
         public List<SingleSegment> Segments { get; }
@@ -143,7 +152,7 @@ namespace TinyDb.Querying
             List<SingleSegment> list = result.Segments;
             for (int i = 0;i<list.Count-1; )
             {
-                if (list[i].Intersects(list[i + 1]))
+                if (list[i].Join(list[i + 1]))
                 {
                     SingleSegment a = list[i];
                     SingleSegment b = list[i + 1];
@@ -266,7 +275,7 @@ namespace TinyDb.Querying
             List<SingleSegment> list = result.Segments;
             for (int i = 0; i < list.Count-1;)
             {
-                if (list[i].Intersects(list[i + 1]))
+                if (list[i].Join(list[i + 1]))
                 {
                     SingleSegment a = list[i];
                     SingleSegment b = list[i + 1];
