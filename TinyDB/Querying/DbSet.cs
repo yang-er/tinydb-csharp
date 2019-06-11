@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using TinyDb.Indexing;
 using TinyDb.Querying;
 using TinyDb.Structure;
 
@@ -38,7 +39,21 @@ namespace TinyDb
 
         internal IEnumerable<T> FindBySegment(Segment sg)
         {
-            return new T[0];
+            //List<Entity> result = new List<Entity>;
+            List<T> result = new List<T>();
+            foreach (var i in sg.Segments)
+            {
+                var node = FindNode(root, i.Left);
+
+                while (node != null && i.Contains(node.Key))
+                {
+                    foreach (var item in node.GetData())
+                        if (i.Contains(item.Id))
+                            result.Add(item);
+                    node = node.RightNode;
+                }
+            }
+            return result;
         }
 
         public void Insert(T entity)
