@@ -62,5 +62,37 @@ namespace TestDb.UnitTest
                );
             Assert.IsTrue(s5.Equal(s5t));
         }
+
+        [TestMethod]
+        public void Test2()
+        {
+            var s1 = new Segment(
+                new Segment.SingleSegment(1, 3, true, false),
+                new Segment.SingleSegment(10, 14, true, true)
+                );
+            var s2 = new Segment(
+                new Segment.SingleSegment(0, 2, false, false),
+                new Segment.SingleSegment(5, 10, false, false)
+                );
+            var s3 = s1.Intersect(s2);
+
+            var s3t = new Segment(
+               new Segment.SingleSegment(1, 2, true, false)
+               );
+            Assert.IsTrue(s3.Equal(s3t));
+            var s4 = s1.Join(s2);
+            var s4t = new Segment(
+               new Segment.SingleSegment(0, 3, false, false),
+               new Segment.SingleSegment(5, 14, false, true)
+               );
+            Assert.IsTrue(s4.Equal(s4t));
+            var s5 = s1.Reverse();
+            var s5t = new Segment(
+               new Segment.SingleSegment(int.MinValue, 1, true, false),
+               new Segment.SingleSegment(3, 10, true, false),
+               new Segment.SingleSegment(14, int.MaxValue, false, true)
+               );
+            Assert.IsTrue(s5.Equal(s5t));
+        }
     }
 }
