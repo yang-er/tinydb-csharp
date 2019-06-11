@@ -78,5 +78,15 @@ namespace TinyDb.Querying
         {
             return null;
         }
+
+        public Segment Intersect(Segment segment)
+        {
+            return null;
+        }
+
+        public Segment Join(Segment segment)
+        {
+            return null;
+        }
     }
 }
