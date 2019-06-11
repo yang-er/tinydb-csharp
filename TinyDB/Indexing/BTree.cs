@@ -8,7 +8,6 @@ namespace TinyDb
     public partial class DbSet<T>
     {
         IndexNode<T> root;
-
         /// <summary>
         /// 寻找一个节点。
         /// </summary>
