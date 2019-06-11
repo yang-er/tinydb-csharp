@@ -36,9 +36,14 @@ namespace TinyDb
 
         public IQueryProvider Provider { get; }
 
+        internal IEnumerable<T> FindBySegment(Segment sg)
+        {
+            return new T[0];
+        }
+
         public void Insert(T entity)
         {
-            var node = FindNode(root, entity.PrimaryKey);
+            var node = FindNode(root, entity.Id);
             Insert(node, entity);
             File.WriteAllText($"{TableName}.index", (root is null ? null : Convert(root)).ToJson());
         }

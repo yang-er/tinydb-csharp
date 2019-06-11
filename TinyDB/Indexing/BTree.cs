@@ -52,7 +52,7 @@ namespace TinyDb
 
             // 叶节点中无该索引
             node.GetData().Add(de); // 添加关键字至关键字集合
-            node.GetData().Sort((t, t2) => t.PrimaryKey.CompareTo(t2.PrimaryKey)); // 将关键字排序
+            node.GetData().Sort((t, t2) => t.Id.CompareTo(t2.Id)); // 将关键字排序
             node.FlushData();
 
             if (node.GetData().Last().Equals(de) && node.RightNode == null)
@@ -61,7 +61,7 @@ namespace TinyDb
                 var temp = node.Parent;
                 while (temp != null)
                 {
-                    temp.Childs.Last().Key = de.PrimaryKey;
+                    temp.Childs.Last().Key = de.Id;
                     temp = temp.Parent;
                 }
             }
@@ -82,7 +82,7 @@ namespace TinyDb
             if (node.IsLeaf)
             {
                 int n = node.GetData().Count / 2; // 分裂位置
-                int leftkey = node.GetData()[n].PrimaryKey; //分裂处的关键字
+                int leftkey = node.GetData()[n].Id; //分裂处的关键字
                 var newLeaf = new IndexNode<T>(null, new List<T>(), node.RightNode);
 
                 while (n-- > 0)
@@ -92,8 +92,8 @@ namespace TinyDb
                 }
 
                 node.RightNode = newLeaf;
-                newLeaf.GetData().Sort((t, t2) => t.PrimaryKey.CompareTo(t2.PrimaryKey));
-                int rightKey = newLeaf.GetData().Last().PrimaryKey;
+                newLeaf.GetData().Sort((t, t2) => t.Id.CompareTo(t2.Id));
+                int rightKey = newLeaf.GetData().Last().Id;
 
                 node.FlushData();
                 newLeaf.FlushData();

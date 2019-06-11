@@ -11,7 +11,7 @@ namespace TinyDb.Querying
         public MyQueryable(QueryProvider provider, Expression expression = null)
         {
             Provider = provider ?? throw new ArgumentNullException(nameof(provider));
-            Expression = expression ?? Expression.Constant(this);
+            Expression = expression ?? throw new ArgumentNullException(nameof(expression));
         }
 
         public Type ElementType => typeof(T);

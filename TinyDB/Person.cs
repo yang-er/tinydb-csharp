@@ -1,4 +1,7 @@
-﻿using TinyDb.Structure;
+﻿using System;
+using System.Linq.Expressions;
+using System.Reflection;
+using TinyDb.Structure;
 
 namespace TinyDb
 {
@@ -16,8 +19,6 @@ namespace TinyDb
         public int Age { get; set; }
 
         public Sex Sex { get; set; }
-
-        public int PrimaryKey => Id;
 
         public int Version => 1;
     }
