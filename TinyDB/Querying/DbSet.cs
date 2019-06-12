@@ -37,7 +37,7 @@ namespace TinyDb
 
         public IQueryProvider Provider { get; }
 
-        internal IEnumerable<T> FindBySegment(Segment sg)
+        internal IEnumerable<T> FindBySegment(Segment sg, Func<T, bool> predicate)
         {
             //List<Entity> result = new List<Entity>;
             List<T> result = new List<T>();
@@ -48,7 +48,7 @@ namespace TinyDb
                 while (node != null && i.Contains(node.Key))
                 {
                     foreach (var item in node.GetData())
-                        if (i.Contains(item.Id))
+                        if (predicate.Invoke(item))
                             result.Add(item);
                     node = node.RightNode;
                 }

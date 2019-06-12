@@ -21,5 +21,10 @@ namespace TinyDb
         public Sex Sex { get; set; }
 
         public int Version => 1;
+
+        public override string ToString()
+        {
+            return $"Person(V{Version}) [Id={Id},Name={Name},Age={Age},Sex={Sex}]";
+        }
     }
 }
