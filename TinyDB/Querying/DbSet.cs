@@ -11,76 +11,61 @@ using TinyDb.Structure;
 
 namespace TinyDb
 {
-    public partial class DbSet<T> : IQueryable<T>
-        where T : IDbEntry
+    public class DbSet<T> : BpTree<T>, IQueryable<T> where T : IDbEntry
     {
-        public DbSet(string tableName)
-        {
-            Provider = new QueryProvider();
-            Expression = Expression.Constant(this);
-            TableName = tableName;
-
-            if (File.Exists($"{tableName}.index"))
-            {
-                var vt = File.ReadAllText($"{tableName}.index")
-                    .ParseJson<VirtualTree>();
-                root = null;
-                root = ConvertBack(vt);
-            }
-        }
-
-        public string TableName { get; }
-
         public Type ElementType => typeof(T);
 
         public Expression Expression { get; }
 
         public IQueryProvider Provider { get; }
 
+        public DbSet(string tableName) : base(tableName)
+        {
+            Provider = new QueryProvider();
+            Expression = Expression.Constant(this);
+        }
+
         internal IEnumerable<T> FindBySegment(Segment sg, Func<T, bool> predicate)
         {
-            //List<Entity> result = new List<Entity>;
             List<T> result = new List<T>();
+
             foreach (var i in sg.Segments)
             {
                 var node = FindNode(root, i.Left);
+                if (node is null) break;
 
-                while (node != null && i.Contains(node.Key))
+                do
                 {
-                    foreach (var item in node.GetData())
+                    foreach (var item in node.Data)
                         if (predicate.Invoke(item))
                             result.Add(item);
                     node = node.RightNode;
                 }
+                while (node != null && node.Key <= i.Right);
             }
             return result;
         }
 
-        public void Insert(T entity)
+        private IEnumerable<T> FetchAll()
         {
-            var node = FindNode(root, entity.Id);
-            Insert(node, entity);
-            File.WriteAllText($"{TableName}.index", (root is null ? null : Convert(root)).ToJson());
-        }
+            var leaf = FindNode(root, int.MinValue);
 
-        public void Delete(T entity)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Update(T entity)
-        {
-            throw new NotImplementedException();
+            while (leaf != null)
+            {
+                foreach (var item in leaf.Data)
+                    yield return item;
+                leaf = leaf.RightNode;
+            }
         }
 
         public IEnumerator<T> GetEnumerator()
         {
-            return AsEnumerable(root).GetEnumerator();
+            return FetchAll().GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return AsEnumerable(root).GetEnumerator();
+            return FetchAll().GetEnumerator();
         }
     }
 }

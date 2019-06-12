@@ -96,12 +96,7 @@ namespace TinyDb.Querying
         private static IEnumerable ConvertQueryableToEnumerable(IEnumerable callsite, MethodCallExpression mce)
         {
             var callArgs = new object[mce.Arguments.Count];
-            var callTypes = new Type[mce.Arguments.Count];
             callArgs[0] = callsite;
-            callTypes[0] = callsite.GetType()
-                .FindInterfaces((f, m) => f.IsGenericType
-                                       && f.GetGenericTypeDefinition() == typeof(IEnumerable<>), false)
-                .FirstOrDefault() ?? throw new InvalidCastException();
 
             var unbuiltArgs = mce.Arguments.Skip(1).ToArray();
             for (int i = 0; i < unbuiltArgs.Length; i++)
@@ -111,13 +106,15 @@ namespace TinyDb.Querying
                     if (unary.Operand is LambdaExpression lambda)
                     {
                         callArgs[i + 1] = lambda.Compile();
-                        callTypes[i + 1] = callArgs[i + 1].GetType();
                     }
                 }
                 else if (unbuiltArgs[i] is LambdaExpression lambda)
                 {
                     callArgs[i + 1] = lambda.Compile();
-                    callTypes[i + 1] = callArgs[i + 1].GetType();
+                }
+                else if (unbuiltArgs[i] is ConstantExpression constexp)
+                {
+                    callArgs[i + 1] = constexp.Value;
                 }
                 else
                 {
@@ -129,9 +126,10 @@ namespace TinyDb.Querying
             var methods = typeof(Enumerable).GetMethods();
             var method = methods
                 .Where(m => mce.Method.Name == m.Name
-                         && ga.Length == m.GetGenericArguments().Length)
+                         && ga.Length == m.GetGenericArguments().Length
+                         && m.GetParameters().Length == callArgs.Length)
                 .Select(m => m.MakeGenericMethod(ga))
-                .FirstOrDefault();
+                .FirstOrDefault() ?? throw new EntryPointNotFoundException(mce.Method.Name);
 
             return (IEnumerable)method.Invoke(null, callArgs);
         }
@@ -191,7 +189,9 @@ namespace TinyDb.Querying
                 }
             };
 
-            var (result, _) = solve(expression);
+            var (result, lastcheck) = solve(expression);
+            if (result is IQueryable qq)
+                result = ExecuteForce(qq, segment, whereArgs.Compile());
             return result;
         }
 
