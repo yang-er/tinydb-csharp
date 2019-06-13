@@ -42,5 +42,18 @@ namespace TinyDb
         {
             return $"Person (V{Version}) [Id={Id},Name={Name},Grade={Grade},School={School},Sex={Sex},EnglishName={EnglishName}]";
         }
+
+        public object Clone()
+        {
+            return new Person
+            {
+                Id = Id,
+                School = School,
+                Sex = Sex,
+                Grade = Grade,
+                Name = Name,
+                EnglishName = EnglishName
+            };
+        }
     }
 }

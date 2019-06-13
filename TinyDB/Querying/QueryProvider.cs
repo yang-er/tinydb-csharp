@@ -134,6 +134,62 @@ namespace TinyDb.Querying
             return (IEnumerable)method.Invoke(null, callArgs);
         }
 
+        internal int ExecuteUpdate(Expression expression, Delegate[] exps)
+        {
+            var segment = new Segment(int.MinValue, int.MaxValue, true, true);
+            Type sourceType = null;
+            LambdaExpression whereArgs = null;
+            MethodInfo predicateCallSite = null;
+            Type predicateType = null;
+            Func<Expression, (IEnumerable, bool)> solve = null;
+
+            solve = exp =>
+            {
+                if (exp is MethodCallExpression mce)
+                {
+                    var res = solve(mce.Arguments.First());
+
+                    if (mce.Method.Name == "Where" && res.Item2)
+                    {
+                        var (newseg, newlambda) = Generate(mce.Arguments.Last());
+                        segment = segment.Intersect(newseg);
+
+                        var toCall = Expression.Parameter(sourceType, "o");
+                        var lastPredicate = Expression.Constant(whereArgs.Compile(), predicateType);
+                        var newlyPredicate = Expression.Constant(newlambda.Compile(), predicateType);
+                        var lastPredicateCall = Expression.Call(lastPredicate, predicateCallSite, toCall);
+                        var newlyPredicateCall = Expression.Call(newlyPredicate, predicateCallSite, toCall);
+                        var andAlsoPredicate = Expression.AndAlso(lastPredicateCall, newlyPredicateCall);
+                        whereArgs = Expression.Lambda(andAlsoPredicate, toCall);
+                        return res;
+                    }
+                    else
+                    {
+                        return (null, false);
+                    }
+                }
+                else if (exp is ConstantExpression ce)
+                {
+                    sourceType = ce.Type.GetGenericArguments().First();
+                    whereArgs = Expression.Lambda(Expression.Constant(true, typeof(bool)), Expression.Parameter(sourceType, "o"));
+                    predicateType = typeof(Func<,>).MakeGenericType(sourceType, typeof(bool));
+                    predicateCallSite = predicateType.GetMethod("Invoke");
+                    return ((IQueryable)ce.Value, true);
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+            };
+
+            var (result, lastcheck) = solve(expression);
+            if (result is null) return -1;
+
+            var item = result.GetType().GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+                .First(m => m.Name == "UpdateBySegment");
+            return (int)item.Invoke(result, new object[] { segment, whereArgs.Compile(), exps });
+        }
+
         public object Execute(Expression expression)
         {
             var segment = new Segment(int.MinValue, int.MaxValue, true, true);

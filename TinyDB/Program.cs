@@ -76,6 +76,14 @@ namespace TinyDb
                          where p.Id > 21180000 && p.Id < 55160000
                          select new { p.Id, p.Name }).ToList();
             foreach (var item in query) Console.WriteLine(item.Name);
+
+            var upd = people
+                .Where(p => p.Id > 55170000)
+                .Where(p => p.EnglishName == "QAQ")
+                .Update(p => p.EnglishName = "FAF");
+            Console.WriteLine("AffectedRows: " + upd);
+
+            foreach (var item in people) Console.WriteLine(item);
         }
 
         static void TestForJoin()

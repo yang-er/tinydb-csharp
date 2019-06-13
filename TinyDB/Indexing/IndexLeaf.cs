@@ -42,7 +42,7 @@ namespace TinyDb.Indexing
             return $"Leaf, {Key}";
         }
 
-        private void SaveToDisk()
+        internal void SaveToDisk()
         {
             if (dataRef.TryGetTarget(out var data))
             {

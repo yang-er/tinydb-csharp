@@ -1,6 +1,10 @@
 ﻿using Newtonsoft.Json;
+using System;
 using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
+using TinyDb.Querying;
 
 namespace TinyDb
 {
@@ -34,6 +38,14 @@ namespace TinyDb
             var sb = new StringBuilder();
             json.Serialize(new JsonTextWriter(new StringWriter(sb)), value);
             return sb.ToString();
+        }
+
+        public static int Update<T>(this IQueryable<T> query, params Action<T>[] exps)
+        {
+            if (exps.Length == 0) return 0;
+            int affectedRows = ((QueryProvider)query.Provider).ExecuteUpdate(query.Expression, exps);
+            if (affectedRows == -1) throw new InvalidOperationException();
+            return affectedRows;
         }
     }
 }

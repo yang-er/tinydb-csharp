@@ -9,6 +9,15 @@ namespace TinyDb
         public string Name { get; set; }
 
         public virtual int Version => 1;
+
+        public object Clone()
+        {
+            return new Contest
+            {
+                Id = Id,
+                Name = Name,
+            };
+        }
     }
 
     public class Problem : IDbEntry
@@ -20,5 +29,15 @@ namespace TinyDb
         public int ContestId { get; set; }
 
         public virtual int Version => 1;
+
+        public object Clone()
+        {
+            return new Problem
+            {
+                Id = Id,
+                ContestId = ContestId,
+                Name = Name,
+            };
+        }
     }
 }

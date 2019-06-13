@@ -37,12 +37,58 @@ namespace TinyDb
                 do
                 {
                     foreach (var item in node.Data)
+                    {
                         if (predicate.Invoke(item))
-                            result.Add(item);
+                        {
+                            var copy = item.Clone();
+                            if (copy.GetType() != typeof(T))
+                                throw new InvalidOperationException("Clone实现不正确。");
+                            result.Add((T)copy);
+                        }
+                    }
+
                     node = node.RightNode;
                 }
                 while (node != null && node.Key <= i.Right);
             }
+
+            return result;
+        }
+
+        internal int UpdateBySegment(Segment sg, Func<T, bool> predicate, IEnumerable<Delegate> acts)
+        {
+            var actions = acts.Select(d => (Action<T>)d).ToList();
+            int result = 0;
+
+            foreach (var i in sg.Segments)
+            {
+                var node = FindNode(root, i.Left);
+                if (node is null) break;
+
+                do
+                {
+                    bool thisNodeEdited = false;
+
+                    foreach (var item in node.Data)
+                    {
+                        if (predicate.Invoke(item))
+                        {
+                            int oldId = item.Id;
+                            thisNodeEdited = true;
+                            actions.ForEach(t => t.Invoke(item));
+                            if (item.Id != oldId)
+                                Console.WriteLine("ID Change Ignored.");
+                            item.Id = oldId;
+                            result++;
+                        }
+                    }
+
+                    if (thisNodeEdited) node.SaveToDisk();
+                    node = node.RightNode;
+                }
+                while (node != null && node.Key <= i.Right);
+            }
+
             return result;
         }
 
